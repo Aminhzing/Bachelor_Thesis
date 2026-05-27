@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
 U = 1
