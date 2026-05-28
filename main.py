@@ -13,7 +13,7 @@ r_vals = np.linspace(-2*a,2*a,100)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
-def calculating_c_k_m():
+def calc_c_k_m():
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2*dim, -U / 2)
     Matrix = []
@@ -26,7 +26,7 @@ def calculating_c_k_m():
         gs_c_k_m.append(eigvecs[:, 0])
     return gs_c_k_m
 
-def calculating_E_k():
+def calc_E_k():
     Eigenenergies = []
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2 * dim, -U / 2)
@@ -38,8 +38,8 @@ def calculating_E_k():
         Eigenenergies.append(np.linalg.eigvalsh(Matrix[idk])[0])
     return Eigenenergies
 
-def calculating_u_k():
-    c_k_m = calculating_c_k_m()
+def calc_u_k():
+    c_k_m = calc_c_k_m()
     u_k = np.zeros((len(k_vals), len(r_vals)), dtype= complex)
     for idk, k in enumerate(k_vals):
         for idr, r in enumerate(r_vals):
@@ -51,8 +51,8 @@ def calculating_u_k():
         #print(area)
     return u_k
 
-def calculating_w_k():
-    u_k = calculating_u_k()
+def calc_w_k():
+    u_k = calc_u_k()
     w = np.zeros( len(r_vals), dtype= complex)
     for idr, r in enumerate(r_vals):
         for idk, k in enumerate(k_vals):
@@ -61,20 +61,24 @@ def calculating_w_k():
     print(area)
     return w
 
-def calculating_cos_pot():
-    Amp = -0.5
-    Rms = 5
-    V = []
+def calc_pot():
+    A_0 = 1
+    A_p = -0.5
+    Rms_p = 5
+    V_0 = []
+    Pert = []
     for idr, r in enumerate(r_vals):
-        V.append(-np.cos(G*r)+Amp*np.exp(-((r-a/2)**2)/(2*Rms)))
-    return V
+        V_0.append(-A_0*np.cos(G*r))
+    for idr, r in enumerate(r_vals):
+        Pert.append(A_p * np.exp(-((r - a / 2) ** 2) / (2 * Rms_p)))
+    return V_0, Pert
 
-def fit_dispersion():
+def fit_disp():
     def disprel(k, mu, t):
         y = -2*t*np.cos(k*a) + mu
         return y
 
-    parameters, covariance = curve_fit(disprel, k_vals, calculating_E_k())
+    parameters, covariance = curve_fit(disprel, k_vals, calc_E_k())
     fit_mu = parameters[0]
     fit_t = parameters[1]
     fit_disprel = disprel(k_vals, fit_mu, fit_t)
@@ -86,18 +90,17 @@ def fit_dispersion():
     print(f"t  = {fit_t:.5f} ± {SE_t:.5f}")
     return fit_disprel
 
-def plotting_dispersion():
+def plot_disp():
     plt.figure()
-    plt.plot(k_vals, calculating_E_k(), 'o', label='data')
-    plt.plot(k_vals, fit_dispersion(), '-', label='fit')
+    plt.plot(k_vals, calc_E_k(), 'o', label='data')
+    plt.plot(k_vals, fit_disp(), '-', label='fit')
     plt.legend()
 
-def plotting_wannier():
+def plot_w_0():
     plt.figure()
-    plt.plot(r_vals, calculating_cos_pot(), label="Potential")
-    plt.plot(r_vals, np.real(calculating_w_k()), label="Wannier")
+    plt.plot(r_vals, calc_pot(), label="Potential")
+    plt.plot(r_vals, np.real(calc_w_k()), label="Wannier")
     plt.xlim(-2*a,2*a)
     plt.legend()
 
     plt.show()
-
