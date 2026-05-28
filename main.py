@@ -4,7 +4,7 @@ from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
 U = 1
-a = 15
+a = 10
 G = 2*np.pi/a
 dim = 50
 
@@ -57,8 +57,8 @@ def calc_w_k():
     for idr, r in enumerate(r_vals):
         for idk, k in enumerate(k_vals):
             w[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
-    area = simpson(np.abs(w) ** 2, r_vals)
-    print(area)
+    #area = simpson(np.abs(w) ** 2, r_vals)
+    #print(area)
     return w
 
 def calc_pot():
@@ -97,10 +97,32 @@ def plot_disp():
     plt.legend()
 
 def plot_w_0():
+    V_0 , _ = calc_pot()
     plt.figure()
-    plt.plot(r_vals, calc_pot(), label="Potential")
+    plt.plot(r_vals, V_0, label="Potential")
     plt.plot(r_vals, np.real(calc_w_k()), label="Wannier")
     plt.xlim(-2*a,2*a)
     plt.legend()
 
     plt.show()
+
+def calc_dmu_dt():
+    dmu = 0
+    dt = 0
+    dr = r_vals[1] - r_vals[0]
+    w_0 = calc_w_k()
+    _ , pert = calc_pot()
+
+    #dmu = simpson(np.abs(w_0)**2*pert, r_vals)
+    for idr, r in enumerate(r_vals):
+        dmu += dr* np.abs(w_0[idr])**2 * pert[idr]
+    print(dmu)
+
+    ext_r_vals = []
+    for idr in range(len(r_vals)):
+        ext_r_vals.append(w_0[idr + ])
+    w_1 = calc_w_k()
+
+fit_disp()
+calc_dmu_dt()
+plot_w_0()
