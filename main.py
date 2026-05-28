@@ -4,12 +4,12 @@ from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
 U = 1
-a = 5
+a = 15
 G = 2*np.pi/a
 dim = 50
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-a/2,a/2,100)
+r_vals = np.linspace(-2*a,2*a,1000)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
@@ -62,9 +62,10 @@ def calculating_w_k():
     return w
 
 def calculating_cos_pot():
+    Amp = -0.5
     V = []
     for idr, r in enumerate(r_vals):
-        V.append(-np.cos(G*r)+np.exp(-((r-a/2)**2)))
+        V.append(-np.cos(G*r)+Amp*np.exp(-((r-a/2)**2)))
     return V
 
 def disprel(k, mu, t):
@@ -75,30 +76,25 @@ parameters, covariance = curve_fit(disprel, k_vals, calculating_E_k())
 fit_mu = parameters[0]
 fit_t = parameters[1]
 fit_disprel = disprel(k_vals, fit_mu, fit_t)
-#print(fit_mu)
-#print(fit_t)
+
 SE = np.sqrt(np.diag(covariance))
 SE_A = SE[0]
 SE_B = SE[1]
-#print(F'The value of A is {fit_mu:.5f} with standard error of {SE_A:.5f}.')
-#print(F'The value of B is {fit_t:.5f} with standard error of {SE_B:.5f}.')
-
-w_0 = calculating_w_k()
-u_k = calculating_u_k()
-
-#y_1 = np.abs(w_0)
-y_2 = np.real(w_0)
-#y_3 = np.imag(w_0)
-#y_4 = calculating_E_k()
-y_5 = calculating_cos_pot()
+print(F' mu is {fit_mu:.5f} with standard error of {SE_A:.5f}.')
+print(F' t is {fit_t:.5f} with standard error of {SE_B:.5f}.')
 
 
-#plt.plot(r_vals, y_5, label="Potential")
-plt.plot(r_vals, y_2, label="Wannier")
-#plt.plot(k_vals, y_4, label = "E_k")
-#plt.plot(k_vals, calculating_E_k(), 'o', label='data')
-#plt.plot(k_vals, fit_disprel, '-', label='fit')
-
+plt.figure()
+plt.plot(k_vals, calculating_E_k(), 'o', label='data')
+plt.plot(k_vals, fit_disprel, '-', label='fit')
 plt.legend()
+
+
+
+plt.figure()
+plt.plot(r_vals, calculating_cos_pot(), label="Potential")
+plt.plot(r_vals, np.real(calculating_w_k()), label="Wannier")
 plt.xlim(-2*a,2*a)
+plt.legend()
+
 plt.show()
