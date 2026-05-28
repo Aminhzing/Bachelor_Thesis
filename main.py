@@ -9,8 +9,8 @@ G = 2*np.pi/a
 dim = 50
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-2*a,2*a,100)
-k_vals = np.linspace(-np.pi/a,np.pi/a,30)
+r_vals = np.linspace(-a/2,a/2,100)
+k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
 def calculating_c_k_m():
@@ -48,19 +48,15 @@ def calculating_u_k():
                 x += np.exp(1j*m*G*r) * c_k_m[idk][idm]
             u_k[idk, idr] = x / np.sqrt(r_vals[len(r_vals)-1] - r_vals[0])
         area = simpson(np.abs(u_k[idk])**2, r_vals)
-
-        #phi = np.angle(u_k[idk, 49])
-        #u_k[idk,:] /= np.exp(1j*phi)
+        #print(area)
     return u_k
 
 def calculating_w_k():
     u_k = calculating_u_k()
     w = np.zeros( len(r_vals), dtype= complex)
-    Norm_k = len(k_vals)
     for idr, r in enumerate(r_vals):
         for idk, k in enumerate(k_vals):
-            w[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / (np.sqrt(Norm_k))
-
+            w[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
     area = simpson(np.abs(w) ** 2, r_vals)
     print(area)
     return w
