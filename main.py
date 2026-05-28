@@ -63,9 +63,10 @@ def calculating_w_k():
 
 def calculating_cos_pot():
     Amp = -0.5
+    Rms = 5
     V = []
     for idr, r in enumerate(r_vals):
-        V.append(-np.cos(G*r)+Amp*np.exp(-((r-a/2)**2)))
+        V.append(-np.cos(G*r)+Amp*np.exp(-((r-a/2)**2)/(2*Rms)))
     return V
 
 def disprel(k, mu, t):
