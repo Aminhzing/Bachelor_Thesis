@@ -69,25 +69,26 @@ def calculating_cos_pot():
         V.append(-np.cos(G*r)+Amp*np.exp(-((r-a/2)**2)/(2*Rms)))
     return V
 
-def disprel(k, mu, t):
-    y = -2*t*np.cos(k*a) + mu
-    return y
+def fit_dispersion():
+    def disprel(k, mu, t):
+        y = -2*t*np.cos(k*a) + mu
+        return y
 
-parameters, covariance = curve_fit(disprel, k_vals, calculating_E_k())
-fit_mu = parameters[0]
-fit_t = parameters[1]
-fit_disprel = disprel(k_vals, fit_mu, fit_t)
+    parameters, covariance = curve_fit(disprel, k_vals, calculating_E_k())
+    fit_mu = parameters[0]
+    fit_t = parameters[1]
+    fit_disprel = disprel(k_vals, fit_mu, fit_t)
 
-SE = np.sqrt(np.diag(covariance))
-SE_A = SE[0]
-SE_B = SE[1]
-print(F' mu is {fit_mu:.5f} with standard error of {SE_A:.5f}.')
-print(F' t is {fit_t:.5f} with standard error of {SE_B:.5f}.')
-
+    SE = np.sqrt(np.diag(covariance))
+    SE_mu = SE[0]
+    SE_t = SE[1]
+    print(f"mu = {fit_mu:.5f} ± {SE_mu:.5f}")
+    print(f"t  = {fit_t:.5f} ± {SE_t:.5f}")
+    return fit_disprel
 
 plt.figure()
 plt.plot(k_vals, calculating_E_k(), 'o', label='data')
-plt.plot(k_vals, fit_disprel, '-', label='fit')
+plt.plot(k_vals, fit_dispersion(), '-', label='fit')
 plt.legend()
 
 
