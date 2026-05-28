@@ -9,7 +9,7 @@ G = 2*np.pi/a
 dim = 50
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-2*a,2*a,1000)
+r_vals = np.linspace(-2*a,2*a,100)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
@@ -86,17 +86,18 @@ def fit_dispersion():
     print(f"t  = {fit_t:.5f} ± {SE_t:.5f}")
     return fit_disprel
 
-plt.figure()
-plt.plot(k_vals, calculating_E_k(), 'o', label='data')
-plt.plot(k_vals, fit_dispersion(), '-', label='fit')
-plt.legend()
+def plotting_dispersion():
+    plt.figure()
+    plt.plot(k_vals, calculating_E_k(), 'o', label='data')
+    plt.plot(k_vals, fit_dispersion(), '-', label='fit')
+    plt.legend()
 
+def plotting_wannier():
+    plt.figure()
+    plt.plot(r_vals, calculating_cos_pot(), label="Potential")
+    plt.plot(r_vals, np.real(calculating_w_k()), label="Wannier")
+    plt.xlim(-2*a,2*a)
+    plt.legend()
 
+    plt.show()
 
-plt.figure()
-plt.plot(r_vals, calculating_cos_pot(), label="Potential")
-plt.plot(r_vals, np.real(calculating_w_k()), label="Wannier")
-plt.xlim(-2*a,2*a)
-plt.legend()
-
-plt.show()
