@@ -3,13 +3,14 @@ from scipy.optimize import curve_fit
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
-U = 1
+U = 0.5
 a = 10
 G = 2*np.pi/a
 dim = 50
+rspacing = 100
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-2*a,2*a,100)
+r_vals = np.linspace(-2*a,2*a,rspacing)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
@@ -62,8 +63,8 @@ def calc_w_k():
     return w
 
 def calc_pot():
-    A_0 = 1
-    A_p = -0.5
+    A_0 = U
+    A_p = -U
     Rms_p = 5
     V_0 = []
     Pert = []
@@ -97,9 +98,13 @@ def plot_disp():
     plt.legend()
 
 def plot_w_0():
-    V_0 , _ = calc_pot()
+    V_0 , Pert = calc_pot()
+    pertpot = []
+    for idr in range(len(r_vals)):
+        pertpot.append( V_0[idr] + Pert[idr])
+
     plt.figure()
-    plt.plot(r_vals, V_0, label="Potential")
+    plt.plot(r_vals, pertpot, label="Potential")
     plt.plot(r_vals, np.real(calc_w_k()), label="Wannier")
     plt.xlim(-2*a,2*a)
     plt.legend()
@@ -118,11 +123,12 @@ def calc_dmu_dt():
         dmu += dr* np.abs(w_0[idr])**2 * pert[idr]
     print(dmu)
 
-    ext_r_vals = []
-    for idr in range(len(r_vals)):
-        ext_r_vals.append(w_0[idr + ])
-    w_1 = calc_w_k()
+    w_0 = calc_w_k()
+    r_vals_cell = np.linspace(-a/2, a/2, len(r_vals)//4)
+    for idr, r in enumerate(r_vals_cell):
+        dt += dr * np.conj(w_0[idr]) * w_0[idr - len(r_vals_cell)] * pert[idr]
+    print(dt)
 
-fit_disp()
+
 calc_dmu_dt()
 plot_w_0()
