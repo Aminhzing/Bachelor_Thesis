@@ -4,13 +4,13 @@ from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
 U = 0.5
-a = 10
+a = 1
 G = 2*np.pi/a
 dim = 50
-rspacing = 100
+
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-2*a,2*a,rspacing)
+r_vals = np.linspace(-2*a,2*a,100)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 
 
@@ -58,14 +58,14 @@ def calc_w_k():
     for idr, r in enumerate(r_vals):
         for idk, k in enumerate(k_vals):
             w[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
-    #area = simpson(np.abs(w) ** 2, r_vals)
-    #print(area)
+    area = simpson(np.abs(w) ** 2, r_vals)
+    print(area)
     return w
 
 def calc_pot():
     A_0 = U
     A_p = -U
-    Rms_p = 5
+    Rms_p = 0.05
     V_0 = []
     Pert = []
     for idr, r in enumerate(r_vals):
@@ -88,7 +88,7 @@ def fit_disp():
     SE_mu = SE[0]
     SE_t = SE[1]
     print(f"mu = {fit_mu:.5f} ± {SE_mu:.5f}")
-    print(f"t  = {fit_t:.5f} ± {SE_t:.5f}")
+    print(f"-t  = {fit_t:.5f} ± {SE_t:.5f}")
     return fit_disprel
 
 def plot_disp():
@@ -105,30 +105,32 @@ def plot_w_0():
 
     plt.figure()
     plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.real(calc_w_k()), label="Wannier")
+    plt.plot(r_vals, np.conj(calc_w_k())*calc_w_k(), label="Wannier")
     plt.xlim(-2*a,2*a)
     plt.legend()
-
+    plt.ylabel("|psi|²")
+    plt.xlabel("Lattice sites")
     plt.show()
 
 def calc_dmu_dt():
-    dmu = 0
     dt = 0
     dr = r_vals[1] - r_vals[0]
     w_0 = calc_w_k()
     _ , pert = calc_pot()
+    r_valscell = np.linspace(-a,a, 50)
+    dmu = simpson(np.abs(w_0)**2*pert, r_vals)
+    #for idr, r in enumerate(r_vals):
+        #dmu += dr* np.abs(w_0[idr])**2 * pert[idr]
+    print( 'dmu = ',dmu)
+    w_1 = np.roll(w_0, len(r_vals)//4)
+    for idr in range(len(r_valscell)):
+        #w_1.append(w_0[idr - len(r_vals) // 4])
+        dt += dr * np.conj(w_0[idr + len(r_valscell) // 2]) * w_1[idr + len(r_valscell) // 2] * pert[idr + len(r_valscell) // 2]
+    print('dt = ', dt)
+    plt.plot(r_vals, pert, 'o', label='pert')
+    plt.plot(r_vals, np.real(w_1), '-', label='w_1')
+    plt.plot(r_vals, np.real(w_0) , '-', label='w_0')
+    plt.show()
 
-    #dmu = simpson(np.abs(w_0)**2*pert, r_vals)
-    for idr, r in enumerate(r_vals):
-        dmu += dr* np.abs(w_0[idr])**2 * pert[idr]
-    print(dmu)
-
-    w_0 = calc_w_k()
-    r_vals_cell = np.linspace(-a/2, a/2, len(r_vals)//4)
-    for idr, r in enumerate(r_vals_cell):
-        dt += dr * np.conj(w_0[idr]) * w_0[idr - len(r_vals_cell)] * pert[idr]
-    print(dt)
-
-
+fit_disp()
 calc_dmu_dt()
-plot_w_0()
