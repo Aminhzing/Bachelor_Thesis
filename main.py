@@ -108,7 +108,7 @@ def plot_w_0():
     plt.plot(r_vals, calc_w_k(), label="Wannier")
     plt.xlim(-4*a,4*a)
     plt.legend()
-    plt.ylabel(|psi|)
+    plt.ylabel("|psi|")
     plt.xlabel("Lattice sites")
     plt.show()
 
