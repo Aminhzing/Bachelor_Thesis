@@ -1,16 +1,18 @@
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.constants import hbar
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
-U = 4
+U = 10
 a = 1
-G = 2*np.pi/a
-dim = 100
+G = 2*np.pi
+dim = 50
+k_L = np.pi
 
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-6*a,6*a,100)
+r_vals = np.linspace(-4*a,4*a,500)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 r_valscell = np.linspace(-a/2,a/2, 100)
 
@@ -21,7 +23,7 @@ def calc_c_k_m():
     gs_c_k_m = []
     for idk, k in enumerate(k_vals):
         for idj, m in enumerate(m_vals):
-            main_diag[idk][idj] = (k+m*G)**2
+            main_diag[idk][idj] = ((k+m*G)/k_L)**2
         Matrix.append(np.diag(main_diag[idk]) + np.diag(sub_diag, 1) + np.diag(sub_diag, -1))
         eigvals, eigvecs = np.linalg.eigh(Matrix[idk])
         gs_c_k_m.append(eigvecs[:, 0])
@@ -34,7 +36,7 @@ def calc_E_k():
     Matrix = []
     for idk, k in enumerate(k_vals):
         for idj, m in enumerate(m_vals):
-            main_diag[idk][idj] = (k+m*G)**2
+            main_diag[idk][idj] = ((k+m*G)/k_L)**2
         Matrix.append(np.diag(main_diag[idk]) + np.diag(sub_diag, 1) + np.diag(sub_diag, -1))
         Eigenenergies.append(np.linalg.eigvalsh(Matrix[idk])[0])
     return Eigenenergies
@@ -61,7 +63,7 @@ def calc_w_k():
 def calc_pot():
     A_0 = U
     A_p = -U
-    Rms_p = 0.1
+    Rms_p = 0.05
     V_0 = []
     Pert = []
     for idr, r in enumerate(r_vals):
@@ -70,7 +72,7 @@ def calc_pot():
         Pert.append(A_p * np.exp(-((r - a / 2) ** 2) / (2 * Rms_p)))
     return V_0, Pert
 
-def fit_disp():
+def calc_mu_t():
     def disprel(k, mu, t):
         y = -2*t*np.cos(k*a) + mu
         return y
@@ -83,28 +85,34 @@ def fit_disp():
     SE = np.sqrt(np.diag(covariance))
     SE_mu = SE[0]
     SE_t = SE[1]
-    print(f"mu = {fit_mu:.5f} ± {SE_mu:.5f}")
-    print(f"-t  = {fit_t:.5f} ± {SE_t:.5f}")
+    print(f"mu = ({fit_mu:.5f} ± {SE_mu:.5f}) E_rec")
+    print(f"t  = ({fit_t:.5f} ± {SE_t:.5f}) E_rec")
     return fit_disprel
 
 def plot_disp():
+    E_k = calc_E_k()
+    fit = calc_mu_t()
     plt.figure()
-    plt.plot(k_vals, calc_E_k(), 'o', label='data')
-    plt.plot(k_vals, fit_disp(), '-', label='fit')
+    plt.plot(k_vals, E_k, '-', label='E_k')
+    plt.plot(k_vals, fit, '-', label='fit')
     plt.legend()
+    plt.ylabel("U/E$_{rec}$")
+    plt.xlabel("k/k$_L$")
+    plt.show()
 
 def plot_w_0():
-    V_0 , Pert = calc_pot()
+    V_0 , pert = calc_pot()
     pertpot = []
     for idr in range(len(r_vals)):
-        pertpot.append( V_0[idr] + Pert[idr])
+        pertpot.append( V_0[idr] + pert[idr])
 
     plt.figure()
     plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.abs(calc_w_k())**2, label="Wannier")
+    plt.plot(r_vals, calc_w_k(), label="Wannier (without units)")
+    plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
-    plt.ylabel("|psi|")
-    plt.xlabel("Lattice sites")
+    plt.ylabel("U/E$_{rec}$")
+    plt.xlabel("x/a")
     plt.show()
 
 def calc_dmu_dt():
@@ -118,16 +126,14 @@ def calc_dmu_dt():
         w_1[idr] = 0
 
     dmu = simpson(np.abs(w_0)**2*pert, r_vals)
-    print( 'dmu = ',dmu)
-
+    print( 'dmu =', dmu, 'E_rec')
     for idr in range(len(r_vals)):
         dt += dr * np.conj(w_0[idr]) * w_1[idr] * pert[idr]
-    print('dt = ', dt)
-    plt.plot(r_vals, pert, '-', label='pert')
-    plt.plot(r_vals, np.real(w_1), '-', label='w_1')
-    plt.plot(r_vals, np.real(w_0) , '-', label='w_0')
-    plt.show()
+    print('dt =', np.real(dt), 'E_rec' )
 
-fit_disp()
-calc_dmu_dt()
-plot_w_0()
+    #plt.plot(r_vals, pert, '-', label='pert')
+    #plt.plot(r_vals, np.real(w_1), '-', label='w_1')
+    #plt.plot(r_vals, np.real(w_0) , '-', label='w_0')
+    #plt.show()
+
+plot_disp()
