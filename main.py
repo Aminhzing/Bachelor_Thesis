@@ -7,14 +7,16 @@ import matplotlib.pyplot as plt
 U = 10
 a = 1
 G = 2*np.pi
-dim = 50
+dim = 20
 k_L = np.pi
-
+band_cutoff = 1
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-4*a,4*a,500)
+r_vals = np.linspace(-4*a,4*a,100)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 r_valscell = np.linspace(-a/2,a/2, 100)
+
+
 
 def calc_c_k_m():
     main_diag = np.zeros((len(k_vals), len(m_vals)))
@@ -28,6 +30,22 @@ def calc_c_k_m():
         eigvals, eigvecs = np.linalg.eigh(Matrix[idk])
         gs_c_k_m.append(eigvecs[:, 0])
     return gs_c_k_m
+
+def calc_c_k_m_n():  #produces c_k_m_n[k][n][m]
+    main_diag = np.zeros((len(k_vals), len(m_vals)))
+    sub_diag = np.full(2*dim, -U / 2)
+    Matrix = []
+    c_k_m_n = []
+    for idk, k in enumerate(k_vals):
+        c_m_n = []
+        for idm, m in enumerate(m_vals):
+            main_diag[idk][idm] = ((k+m*G)/k_L)**2
+        Matrix.append(np.diag(main_diag[idk]) + np.diag(sub_diag, 1) + np.diag(sub_diag, -1))
+        eigvals, eigvecs = np.linalg.eigh(Matrix[idk])
+        for idn in range(band_cutoff):
+            c_m_n.append(eigvecs[:, idn])
+        c_k_m_n.append(c_m_n)
+    return c_k_m_n
 
 def calc_E_k():
     Eigenenergies = []
@@ -131,9 +149,4 @@ def calc_dmu_dt():
         dt += dr * np.conj(w_0[idr]) * w_1[idr] * pert[idr]
     print('dt =', np.real(dt), 'E_rec' )
 
-    #plt.plot(r_vals, pert, '-', label='pert')
-    #plt.plot(r_vals, np.real(w_1), '-', label='w_1')
-    #plt.plot(r_vals, np.real(w_0) , '-', label='w_0')
-    #plt.show()
-
-plot_disp()
+print(calc_c_k_m_n())
