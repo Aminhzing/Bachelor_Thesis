@@ -1,21 +1,21 @@
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.constants import hbar
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 
-U = 10
+U = 5
 a = 1
 G = 2*np.pi
 dim = 20
 k_L = np.pi
-band_cutoff = 1
+band_cutoff = 5
+
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-4*a,4*a,100)
+r_vals = np.linspace(-2*a,2*a,100)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 r_valscell = np.linspace(-a/2,a/2, 100)
-
+band_vals = np.arange(0, band_cutoff)
 
 
 def calc_c_k_m():
@@ -31,7 +31,7 @@ def calc_c_k_m():
         gs_c_k_m.append(eigvecs[:, 0])
     return gs_c_k_m
 
-def calc_c_k_m_n():  #produces c_k_m_n[k][n][m]
+def calc_c_k_n_m():  #produces c_k_m_n[k][n][m]
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2*dim, -U / 2)
     Matrix = []
@@ -45,7 +45,7 @@ def calc_c_k_m_n():  #produces c_k_m_n[k][n][m]
         for idn in range(band_cutoff):
             c_m_n.append(eigvecs[:, idn])
         c_k_m_n.append(c_m_n)
-    return c_k_m_n
+    return c_k_m_n #produces c_k_m_n[k][n][m]
 
 def calc_E_k():
     Eigenenergies = []
@@ -70,13 +70,34 @@ def calc_u_k():
             u_k[idk][idr] = x
     return u_k
 
-def calc_w_k():
+def calc_u_n_k(): #produces u_n_k[n][k][r]
+    c_k_n_m = calc_c_k_n_m()
+    u_n_k = np.zeros((len(band_vals), len(k_vals), len(r_vals)), dtype= complex)
+    for idn in range(len(band_vals)):
+        for idk in range(len(k_vals)):
+            for idr, r in enumerate(r_vals):
+                x = 0j
+                for idm, m in enumerate(m_vals):
+                    x += np.exp(1j*m*G*r) * c_k_n_m[idk][idn][idm]
+                u_n_k[idn][idk][idr] = x
+    return u_n_k
+
+def calc_w_0():
     u_k = calc_u_k()
-    w = np.zeros( len(r_vals), dtype= complex)
+    w_0 = np.zeros( len(r_vals), dtype= complex)
     for idr, r in enumerate(r_vals):
         for idk, k in enumerate(k_vals):
-            w[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
-    return w
+            w_0[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
+    return w_0
+
+def calc_w_n_0():
+    u_n_k = calc_u_n_k()
+    w_n_0 = np.zeros((len(band_vals), len(r_vals)), dtype= complex)
+    for idn in range(len(band_vals)):
+        for idr, r in enumerate(r_vals):
+            for idk, k in enumerate(k_vals):
+                w_n_0[idn][idr] += np.exp(1j * k  * r) * u_n_k[idn][idk][idr] / len(k_vals)
+    return w_n_0
 
 def calc_pot():
     A_0 = U
@@ -120,14 +141,19 @@ def plot_disp():
 
 def plot_w_0():
     V_0 , pert = calc_pot()
+    w_n_0 = calc_w_n_0()
+    u_n_k = calc_u_n_k()
     pertpot = []
     for idr in range(len(r_vals)):
         pertpot.append( V_0[idr] + pert[idr])
 
     plt.figure()
-    plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, calc_w_k(), label="Wannier (without units)")
-    plt.plot(r_vals, pert, label ="Perturbation")
+    #plt.plot(r_vals, pertpot, label="Potential")
+    plt.plot(r_vals, np.real(w_n_0[0]), label="0th wannier")
+    #plt.plot(r_vals, np.real(w_n_0[1]), label="1")
+    #plt.plot(r_vals, np.real(w_n_0[2]), label="2")
+    #plt.plot(r_vals, np.real(w_n_0[3]), label="3")
+    #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
     plt.ylabel("U/E$_{rec}$")
     plt.xlabel("x/a")
@@ -137,7 +163,7 @@ def calc_dmu_dt():
     dt = 0
     dr = r_vals[1] - r_vals[0]
     indlenofsite = len(r_vals) // (r_vals[len(r_vals)-1] - r_vals[0])
-    w_0 = calc_w_k()
+    w_0 = calc_w_0()
     _ , pert = calc_pot()
     w_1 = np.roll(w_0, indlenofsite)
     for idr in range(int(indlenofsite)):
@@ -149,4 +175,4 @@ def calc_dmu_dt():
         dt += dr * np.conj(w_0[idr]) * w_1[idr] * pert[idr]
     print('dt =', np.real(dt), 'E_rec' )
 
-print(calc_c_k_m_n())
+plot_w_0()
