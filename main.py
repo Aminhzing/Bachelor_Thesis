@@ -90,7 +90,7 @@ def calc_w_0():
             w_0[idr] += np.exp(1j * k  * r) * u_k[idk][idr] / len(k_vals)
     return w_0
 
-def calc_w_n_0():
+def calc_w_n_0(): #produces w_n_0[n][r]
     u_n_k = calc_u_n_k()
     w_n_0 = np.zeros((len(band_vals), len(r_vals)), dtype= complex)
     for idn in range(len(band_vals)):
