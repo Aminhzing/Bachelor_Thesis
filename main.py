@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 U = 5
 a = 1
 G = 2*np.pi
-dim = 20
+dim = 30
 k_L = np.pi
-band_cutoff = 5
+band_cutoff = 6
 
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,300)
+r_vals = np.linspace(-8*a,8*a,200)
 k_vals = np.linspace(-np.pi/a,np.pi/a,100)
 r_valscell = np.linspace(-a/2,a/2, 100)
 band_vals = np.arange(0, band_cutoff)
@@ -139,40 +139,36 @@ def plot_disp():
     plt.xlabel("k/k$_L$")
     plt.show()
 
-def plot_w_0():
-    V_0 , pert = calc_pot()
-    w_n_0 = calc_w_n_0()
-    u_n_k = calc_u_n_k()
-    pertpot = []
-    for idr in range(len(r_vals)):
-        pertpot.append( V_0[idr] + pert[idr])
 
-    plt.figure()
-    #plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.real(w_n_0[0]), label="0th wannier")
-    plt.plot(r_vals, np.real(w_n_0[1]), label="1")
-    plt.plot(r_vals, np.real(w_n_0[2]), label="2")
-    plt.plot(r_vals, np.real(w_n_0[3]), label="3")
-    #plt.plot(r_vals, pert, label ="Perturbation")
-    plt.legend()
-    plt.ylabel("U/E$_{rec}$")
-    plt.xlabel("x/a")
-    plt.show()
 
 def calc_mu_t_n():
     sites = r_vals[len(r_vals) - 1]
     dr = r_vals[1] - r_vals[0]
     indlenofsite = len(r_vals) // (r_vals[len(r_vals) - 1] - r_vals[0])
-    w_n_0 = calc_w_n_0()
-    w_n_i = w_n_0 #want to produce w_n_i[n][i][r]
+    w_n_0 = calc_w_n_0() #w_n_0[n][r]
+    w_n_i = [] #want to produce w_n_i[n][i][r]
     for idn in range(band_cutoff):
-        for idi in range(sites):
-            w_n_i.append(np.roll(w_n_0[idn][idi*indlenofsite]))
-    H = np.zeros(band_cutoff, band_cutoff)
+        x = []
+        for idi in range(int(sites)):
+            y = np.roll(w_n_0[idn], idi*indlenofsite)
+            for idr in range(int(idi*indlenofsite)):
+                y[idr] = 0
+            x.append(y)
+        w_n_i.append(x)
+
+    H = [] #want to produce H[n][m][i][j]
+    for idn in range(band_cutoff):
+        for idm in range(band_cutoff):
+            for idi in range(sites):
+                for idj in range(sites):
+                    H[idn][idm][idi][idj] = simpson(np.conj(w_n_i[idn][idi])*(np.gradient(np.gradient(w_n_i[idm][idj]))/(k_L**2)+ U*cos()))
+
+    return w_n_i
+    """H = np.zeros(band_cutoff, band_cutoff)
     for idn in range(len(band_vals)):
         w_n_1.append(np.roll(w_n_0[idn], indlenofsite))
         for idr in range(int(indlenofsite)):
-            w_n_1[idn][idr] = 0
+            w_n_1[idn][idr] = 0"""
 
     #for idr in range()
     print('dmu =', dmu, 'E_rec')
@@ -195,5 +191,27 @@ def calc_dmu_dt():
     for idr in range(len(r_vals)):
         dt += dr * np.conj(w_0[idr]) * w_1[idr] * pert[idr]
     print('dt =', np.real(dt), 'E_rec' )
+
+def plot_w_0():
+    V_0 , pert = calc_pot()
+    w_n_0 = calc_w_n_0()
+    u_n_k = calc_u_n_k()
+    w_n_i = calc_mu_t_n()
+    pertpot = []
+    for idr in range(len(r_vals)):
+        pertpot.append( V_0[idr] + pert[idr])
+
+    plt.figure()
+    #plt.plot(r_vals, pertpot, label="Potential")
+    plt.plot(r_vals, np.real(w_n_i[2][0]), label="0th wannier")
+    plt.plot(r_vals, np.real(w_n_i[2][1]), label="1")
+    plt.plot(r_vals, np.real(w_n_i[2][2]), label="2")
+    plt.plot(r_vals, np.real(w_n_i[2][3]), label="3")
+    #plt.plot(r_vals, pert, label ="Perturbation")
+    plt.legend()
+    plt.ylabel("U/E$_{rec}$")
+    plt.xlabel("x/a")
+    plt.show()
+
 
 plot_w_0()
