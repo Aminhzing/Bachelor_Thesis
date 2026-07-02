@@ -2,18 +2,19 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
+from tqdm import trange
 
 U = 5
 a = 1
 G = 2*np.pi
 dim = 30
 k_L = np.pi
-band_cutoff = 6
-
+band_cutoff = 9
+sites = 3
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,200)
-k_vals = np.linspace(-np.pi/a,np.pi/a,100)
+r_vals = np.linspace(-8*a,8*a,500)
+k_vals = np.linspace(-np.pi/a,np.pi/a,200)
 r_valscell = np.linspace(-a/2,a/2, 100)
 band_vals = np.arange(0, band_cutoff)
 
@@ -113,7 +114,7 @@ def calc_pot():
 
 def calc_mu_t():
     def disprel(k, mu, t):
-        y = -2*t*np.cos(k*a) + mu
+        y = 2*t*np.cos(k*a) - mu
         return y
 
     parameters, covariance = curve_fit(disprel, k_vals, calc_E_k())
@@ -140,42 +141,36 @@ def plot_disp():
     plt.show()
 
 
-
-def calc_mu_t_n():
-    sites = r_vals[len(r_vals) - 1]
-    dr = r_vals[1] - r_vals[0]
+def calc_w_n_i(): #produces w_n_i[n][i][r]
+     # r_vals[len(r_vals)-1]
     indlenofsite = len(r_vals) // (r_vals[len(r_vals) - 1] - r_vals[0])
-    w_n_0 = calc_w_n_0() #w_n_0[n][r]
-    w_n_i = [] #want to produce w_n_i[n][i][r]
-    for idn in range(band_cutoff):
+    w_n_0 = calc_w_n_0()  # w_n_0[n][r]
+    w_n_i = []  # want to produce w_n_i[n][i][r]
+    for idn in range(len(band_vals)):
         x = []
         for idi in range(int(sites)):
-            y = np.roll(w_n_0[idn], idi*indlenofsite)
-            for idr in range(int(idi*indlenofsite)):
+            y = np.roll(w_n_0[idn], idi * indlenofsite)
+            for idr in range(int(idi * indlenofsite)):
                 y[idr] = 0
             x.append(y)
         w_n_i.append(x)
+    return w_n_i
 
-    H = [] #want to produce H[n][m][i][j]
-    for idn in range(band_cutoff):
-        for idm in range(band_cutoff):
+def calc_mu_t_n(): #r_vals[len(r_vals)-1]
+    w_n_i = calc_w_n_i() #want to produce w_n_i[n][i][r]
+    H = np.zeros((len(band_vals), len(band_vals), sites, sites), dtype = complex) #want to produce H[n][m][i][j]
+    pot = []
+    for idr, r in enumerate(r_vals):
+        pot.append( U*np.cos(G*r) )
+
+    for idn in trange(len(band_vals)):
+        for idm in range(len(band_vals)):
             for idi in range(sites):
                 for idj in range(sites):
-                    H[idn][idm][idi][idj] = simpson(np.conj(w_n_i[idn][idi])*(np.gradient(np.gradient(w_n_i[idm][idj]))/(k_L**2)+ U*cos()))
+                    H[idn][idm][idi][idj] = simpson(    np.conj(w_n_i[idn][idi])    *   (((np.gradient(   np.gradient(w_n_i[idm][idj])    )   ) / k_L**2)+ pot * w_n_i[idm][idj]), r_vals       )
 
-    return w_n_i
-    """H = np.zeros(band_cutoff, band_cutoff)
-    for idn in range(len(band_vals)):
-        w_n_1.append(np.roll(w_n_0[idn], indlenofsite))
-        for idr in range(int(indlenofsite)):
-            w_n_1[idn][idr] = 0"""
+    return H
 
-    #for idr in range()
-    print('dmu =', dmu, 'E_rec')
-    for idr in range(len(r_vals)):
-        dt += dr * np.conj(w_0[idr]) * w_1[idr] * pert[idr]
-    print('dt =', np.real(dt), 'E_rec')
-    return
 
 def calc_dmu_dt():
     dt = 0
@@ -194,24 +189,23 @@ def calc_dmu_dt():
 
 def plot_w_0():
     V_0 , pert = calc_pot()
-    w_n_0 = calc_w_n_0()
-    u_n_k = calc_u_n_k()
-    w_n_i = calc_mu_t_n()
+    #w_n_0 = calc_w_n_0()
+    #u_n_k = calc_u_n_k()
+    w_n_i = calc_w_n_i()
     pertpot = []
     for idr in range(len(r_vals)):
         pertpot.append( V_0[idr] + pert[idr])
 
     plt.figure()
     #plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.real(w_n_i[2][0]), label="0th wannier")
-    plt.plot(r_vals, np.real(w_n_i[2][1]), label="1")
-    plt.plot(r_vals, np.real(w_n_i[2][2]), label="2")
-    plt.plot(r_vals, np.real(w_n_i[2][3]), label="3")
+    plt.plot(r_vals, np.imag(w_n_i[5][0]), label="0th wannier")
+    plt.plot(r_vals, np.imag(w_n_i[6][0]), label="1")
+    #plt.plot(r_vals, np.real(w_n_i[0][2]), label="2")
+    #plt.plot(r_vals, np.real(w_n_i[0][3]), label="3")
     #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
     plt.ylabel("U/E$_{rec}$")
     plt.xlabel("x/a")
     plt.show()
-
 
 plot_w_0()
