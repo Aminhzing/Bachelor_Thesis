@@ -3,21 +3,29 @@ from scipy.optimize import curve_fit
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 from tqdm import trange
+import time
 
 U = 5
 a = 1
 G = 2*np.pi
 dim = 30
 k_L = np.pi
-band_cutoff = 9
+band_cutoff = 2
 sites = 3
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,500)
-k_vals = np.linspace(-np.pi/a,np.pi/a,200)
+r_vals = np.linspace(-2*a,2*a,100)
+k_vals = np.linspace(-np.pi/a,np.pi/a,5)
 r_valscell = np.linspace(-a/2,a/2, 100)
 band_vals = np.arange(0, band_cutoff)
 
+def time_this(func):
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        print(f"{func.__name__} took {time.perf_counter() - start:.6f}s")
+        return result
+    return wrapper
 
 def calc_c_k_m():
     main_diag = np.zeros((len(k_vals), len(m_vals)))
@@ -32,7 +40,8 @@ def calc_c_k_m():
         gs_c_k_m.append(eigvecs[:, 0])
     return gs_c_k_m
 
-def calc_c_k_n_m():  #produces c_k_m_n[k][n][m]
+
+def calc_c_k_n_m():  #produces c_k_n_m[k][n][m]
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2*dim, -U / 2)
     Matrix = []
@@ -46,7 +55,7 @@ def calc_c_k_n_m():  #produces c_k_m_n[k][n][m]
         for idn in range(band_cutoff):
             c_m_n.append(eigvecs[:, idn])
         c_k_m_n.append(c_m_n)
-    return c_k_m_n #produces c_k_m_n[k][n][m]
+    return c_k_m_n
 
 def calc_E_k():
     Eigenenergies = []
@@ -71,16 +80,23 @@ def calc_u_k():
             u_k[idk][idr] = x
     return u_k
 
-def calc_u_n_k(): #produces u_n_k[n][k][r]
+@time_this
+def calc_u_n_k():
     c_k_n_m = calc_c_k_n_m()
-    u_n_k = np.zeros((len(band_vals), len(k_vals), len(r_vals)), dtype= complex)
+
+    #phase[m, r]
+    phase = np.exp(1j * np.outer(m_vals * G, r_vals))
+
+    # Contract over m:
+    # c[k,n,m] * phase[m,r] -> u[n,k,r]
+    u_n_k = np.einsum('knm,mr->nkr', c_k_n_m, phase)
+
     for idn in range(len(band_vals)):
-        for idk in range(len(k_vals)):
-            for idr, r in enumerate(r_vals):
-                x = 0j
-                for idm, m in enumerate(m_vals):
-                    x += np.exp(1j*m*G*r) * c_k_n_m[idk][idn][idm]
-                u_n_k[idn][idk][idr] = x
+        for idk, k in enumerate(k_vals):
+            #gauge = np.angle(u_n_k[idn][idk][len(r_vals) // 2])
+            u_n_k[idn][idk] *= np.exp(-1j * k* a)
+
+
     return u_n_k
 
 def calc_w_0():
@@ -140,9 +156,8 @@ def plot_disp():
     plt.xlabel("k/k$_L$")
     plt.show()
 
-
+@time_this
 def calc_w_n_i(): #produces w_n_i[n][i][r]
-     # r_vals[len(r_vals)-1]
     indlenofsite = len(r_vals) // (r_vals[len(r_vals) - 1] - r_vals[0])
     w_n_0 = calc_w_n_0()  # w_n_0[n][r]
     w_n_i = []  # want to produce w_n_i[n][i][r]
@@ -156,19 +171,17 @@ def calc_w_n_i(): #produces w_n_i[n][i][r]
         w_n_i.append(x)
     return w_n_i
 
-def calc_mu_t_n(): #r_vals[len(r_vals)-1]
+@time_this
+def calc_mu_t_n():
     w_n_i = calc_w_n_i() #want to produce w_n_i[n][i][r]
     H = np.zeros((len(band_vals), len(band_vals), sites, sites), dtype = complex) #want to produce H[n][m][i][j]
-    pot = []
-    for idr, r in enumerate(r_vals):
-        pot.append( U*np.cos(G*r) )
+    V_0, V_1 = calc_pot()
 
     for idn in trange(len(band_vals)):
         for idm in range(len(band_vals)):
             for idi in range(sites):
                 for idj in range(sites):
-                    H[idn][idm][idi][idj] = simpson(    np.conj(w_n_i[idn][idi])    *   (((np.gradient(   np.gradient(w_n_i[idm][idj])    )   ) / k_L**2)+ pot * w_n_i[idm][idj]), r_vals       )
-
+                    H[idn][idm][idi][idj] = simpson(    np.conj(w_n_i[idn][idi])    *      (np.gradient(np.gradient(w_n_i[idm][idj]/ k_L**2)) + V_0* w_n_i[idm][idj] + V_1 * w_n_i[idm][idj]) , r_vals       )
     return H
 
 
@@ -190,7 +203,7 @@ def calc_dmu_dt():
 def plot_w_0():
     V_0 , pert = calc_pot()
     #w_n_0 = calc_w_n_0()
-    #u_n_k = calc_u_n_k()
+    u_n_k = calc_u_n_k()
     w_n_i = calc_w_n_i()
     pertpot = []
     for idr in range(len(r_vals)):
@@ -198,14 +211,15 @@ def plot_w_0():
 
     plt.figure()
     #plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.imag(w_n_i[5][0]), label="0th wannier")
-    plt.plot(r_vals, np.imag(w_n_i[6][0]), label="1")
-    #plt.plot(r_vals, np.real(w_n_i[0][2]), label="2")
-    #plt.plot(r_vals, np.real(w_n_i[0][3]), label="3")
+    #plt.plot(r_vals, np.imag(u_n_k[1][4]), label="0th wannier")
+    #plt.plot(r_vals, np.real(u_n_k[1][4]), label="1")
+    plt.plot(r_vals, np.real(w_n_i[1][0]), label="2")
+    plt.plot(r_vals, np.imag(w_n_i[1][0]), label="3")
     #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
     plt.ylabel("U/E$_{rec}$")
     plt.xlabel("x/a")
     plt.show()
 
+print(calc_u_n_k())
 plot_w_0()
