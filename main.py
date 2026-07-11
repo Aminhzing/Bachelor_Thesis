@@ -8,15 +8,14 @@ import time
 U = 5
 a = 1
 G = 2*np.pi
-dim = 30
+dim = 100
 k_L = np.pi
-band_cutoff = 2
-sites = 3
+band_cutoff = 6
+sites = 6
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-2*a,2*a,100)
-k_vals = np.linspace(-np.pi/a,np.pi/a,5)
-r_valscell = np.linspace(-a/2,a/2, 100)
+r_vals = np.linspace(-8*a,8*a,1001)
+k_vals = np.linspace(-np.pi/a,np.pi/a,1000)
 band_vals = np.arange(0, band_cutoff)
 
 def time_this(func):
@@ -45,17 +44,37 @@ def calc_c_k_n_m():  #produces c_k_n_m[k][n][m]
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2*dim, -U / 2)
     Matrix = []
-    c_k_m_n = []
+    c_k_n_m = []
     for idk, k in enumerate(k_vals):
-        c_m_n = []
+        c_n_m = []
         for idm, m in enumerate(m_vals):
             main_diag[idk][idm] = ((k+m*G)/k_L)**2
         Matrix.append(np.diag(main_diag[idk]) + np.diag(sub_diag, 1) + np.diag(sub_diag, -1))
-        eigvals, eigvecs = np.linalg.eigh(Matrix[idk])
+        _, eigvecs = np.linalg.eigh(Matrix[idk])
+
         for idn in range(band_cutoff):
-            c_m_n.append(eigvecs[:, idn])
-        c_k_m_n.append(c_m_n)
-    return c_k_m_n
+            c_n_m.append(eigvecs[:, idn].astype(complex))
+        c_k_n_m.append(c_n_m)
+
+    for idn in range(band_cutoff):  #Gauge smoothing
+        for idk in range(1, len(k_vals)):
+            overlap = np.vdot(c_k_n_m[idk - 1][idn], c_k_n_m[idk][idn])
+
+            c_k_n_m[idk][idn] *= np.exp(-1j * np.angle(overlap))
+
+    for idn in range(len(band_vals)):   #enforcing symmetry
+        for idk_minus in range(len(k_vals) // 2):
+            idk_plus = len(k_vals) - 1 - idk_minus
+
+            target = np.conj(c_k_n_m[idk_minus][idn][::-1])
+
+            # calculate the phase mismatch
+            phase = np.angle(np.vdot(c_k_n_m[idk_plus][idn], target))
+
+            # rotate the -k state into the correct gauge
+            c_k_n_m[idk_plus][idn] *= np.exp(1j * phase)
+
+    return c_k_n_m
 
 def calc_E_k():
     Eigenenergies = []
@@ -83,19 +102,14 @@ def calc_u_k():
 @time_this
 def calc_u_n_k():
     c_k_n_m = calc_c_k_n_m()
-
-    #phase[m, r]
     phase = np.exp(1j * np.outer(m_vals * G, r_vals))
 
-    # Contract over m:
-    # c[k,n,m] * phase[m,r] -> u[n,k,r]
-    u_n_k = np.einsum('knm,mr->nkr', c_k_n_m, phase)
+    u_n_k = np.einsum('knm,mr->nkr', c_k_n_m, phase) #u_n_k[n][k][r]
 
-    for idn in range(len(band_vals)):
-        for idk, k in enumerate(k_vals):
-            #gauge = np.angle(u_n_k[idn][idk][len(r_vals) // 2])
-            u_n_k[idn][idk] *= np.exp(-1j * k* a)
-
+    for idn in range(len(band_vals)):   #smoothing the gauge
+        for idk in range(1, len(k_vals)):
+            overlap = np.vdot(u_n_k[idn][idk - 1], u_n_k[idn][idk])
+            u_n_k[idn][idk] *= np.exp(-1j * np.angle(overlap))
 
     return u_n_k
 
@@ -157,18 +171,31 @@ def plot_disp():
     plt.show()
 
 @time_this
+#def calc_w_n_i(): #produces w_n_i[n][i][r]
+    #indlenofsite = len(r_vals) // (r_vals[len(r_vals) - 1] - r_vals[0])
+    #w_n_0 = calc_w_n_0()  # w_n_0[n][r]
+    #w_n_i = []  # want to produce w_n_i[n][i][r]
+    #for idn in range(len(band_vals)):
+    #    x = []
+     #   for idi in range(int(sites)):
+      #      y = np.roll(w_n_0[idn], idi * indlenofsite)
+       #     for idr in range(int(idi * indlenofsite)):
+        #        y[idr] = 0
+         #   x.append(y)
+        #w_n_i.append(x)
+    #return w_n_i
+
 def calc_w_n_i(): #produces w_n_i[n][i][r]
-    indlenofsite = len(r_vals) // (r_vals[len(r_vals) - 1] - r_vals[0])
-    w_n_0 = calc_w_n_0()  # w_n_0[n][r]
-    w_n_i = []  # want to produce w_n_i[n][i][r]
-    for idn in range(len(band_vals)):
-        x = []
-        for idi in range(int(sites)):
-            y = np.roll(w_n_0[idn], idi * indlenofsite)
-            for idr in range(int(idi * indlenofsite)):
-                y[idr] = 0
-            x.append(y)
-        w_n_i.append(x)
+    u_n_k = calc_u_n_k() #u_n_k[n][k][r]
+    site_vals = np.arange(sites)
+    phase = np.exp(1j * k_vals[:, None, None] *(r_vals[None, None, :] - site_vals[None, :, None]))
+    w_n_i = np.einsum('kir,nkr->nir',phase, u_n_k) / len(k_vals)
+    #w_n_i = np.zeros((len(band_vals), sites,  len(r_vals)), dtype=complex)  #w_n_i[n][i][r]
+    #for idn in range(len(band_vals)):
+       # for idi in range(sites):
+         #   for idr, r in enumerate(r_vals):
+            #    for idk, k in enumerate(k_vals):
+           #         w_n_i[idn][idi][idr] += np.exp(1j * k * (r-idi)) * u_n_k[idn][idk][idr] / len(k_vals)
     return w_n_i
 
 @time_this
@@ -213,13 +240,17 @@ def plot_w_0():
     #plt.plot(r_vals, pertpot, label="Potential")
     #plt.plot(r_vals, np.imag(u_n_k[1][4]), label="0th wannier")
     #plt.plot(r_vals, np.real(u_n_k[1][4]), label="1")
-    plt.plot(r_vals, np.real(w_n_i[1][0]), label="2")
-    plt.plot(r_vals, np.imag(w_n_i[1][0]), label="3")
+    plt.plot(r_vals, np.real(w_n_i[3][5]), label="2")
+    plt.plot(r_vals, np.imag(w_n_i[3][5]), label="3")
+    plt.plot(r_vals, np.abs(w_n_i[3][5])**2, label="4")
+    print(simpson(np.abs(w_n_i[1][0]) ** 2))
     #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
     plt.ylabel("U/E$_{rec}$")
     plt.xlabel("x/a")
     plt.show()
 
-print(calc_u_n_k())
-plot_w_0()
+
+print(calc_w_n_i())
+#plot_w_0()
+#print(np.max(np.abs(w_n_i - )))
