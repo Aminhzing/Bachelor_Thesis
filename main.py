@@ -10,11 +10,11 @@ a = 1
 G = 2*np.pi
 dim = 100
 k_L = np.pi
-band_cutoff = 4
-sites = 2
+band_cutoff = 6
+sites = 3
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,10001)
+r_vals = np.linspace(-8*a,8*a,5001)
 k_vals = np.linspace(-np.pi/a,np.pi/a,1000, endpoint=False)
 band_vals = np.arange(0, band_cutoff)
 
@@ -56,23 +56,24 @@ def calc_c_k_n_m():  #produces c_k_n_m[k][n][m]
             c_n_m.append(eigvecs[:, idn].astype(complex))
         c_k_n_m.append(c_n_m)
 
+  #  for idn in range(band_cutoff):
+   #     for idk, k in enumerate(k_vals):
+    #        # find index of -k
+     #       idk_minus = np.argmin(np.abs(k_vals + k))
+
+      #      target = np.conj(c_k_n_m[idk][idn][::-1])
+
+       #     phase = np.angle(
+         #       np.vdot(c_k_n_m[idk_minus][idn], target)
+        #    )
+
+          #  c_k_n_m[idk_minus][idn] *= np.exp(1j * phase)
+
     for idn in range(band_cutoff):  #Gauge smoothing
-        for idk in range(1, len(k_vals)):
+       for idk in range(len(k_vals)):
             overlap = np.vdot(c_k_n_m[idk - 1][idn], c_k_n_m[idk][idn])
 
             c_k_n_m[idk][idn] *= np.exp(-1j * np.angle(overlap))
-
-    for idn in range(len(band_vals)):   #enforcing symmetry
-        for idk_minus in range(len(k_vals) // 2):
-            idk_plus = len(k_vals) - 1 - idk_minus
-
-            target = np.conj(c_k_n_m[idk_minus][idn][::-1])
-
-             #calculate the phase mismatch
-            phase = np.angle(np.vdot(c_k_n_m[idk_plus][idn], target))
-
-             #rotate the -k state into the correct gauge
-            c_k_n_m[idk_plus][idn] *= np.exp(1j * phase)
 
     return c_k_n_m
 
@@ -172,6 +173,16 @@ def calc_w_n_i(): #produces w_n_i[n][i][r]
     phase = np.exp(1j * k_vals[:, None, None] *(r_vals[None, None, :] - site_vals[None, :, None]))
     w_n_i = np.einsum('kir,nkr->nir',phase, u_n_k) / len(k_vals)
 
+    for n in range(band_cutoff):
+        w = w_n_i[n, 0]
+
+        # find point with largest amplitude
+        idx = np.argmax(np.abs(w))
+
+        # rotate that point to be real
+        phase = np.angle(w[idx])
+
+        w_n_i[n, :] *= np.exp(-1j * phase)
     return w_n_i
 
 @time_this
@@ -214,9 +225,9 @@ def plot_w_0():
 
     plt.figure()
     #plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.real(w_n_i[3][0]), label="2")
-    plt.plot(r_vals, np.imag(w_n_i[3][0]), label="3")
-    plt.plot(r_vals, np.abs(w_n_i[3][0])**2, label="4")
+   # plt.plot(r_vals, np.real(w_n_i[4][0]), label="2")
+    #plt.plot(r_vals, np.imag(w_n_i[4][0]), label="3")
+    plt.plot(r_vals, np.abs(w_n_i[5][0])**2, label="4")
     print(simpson(np.abs(w_n_i[5][0]) ** 2, x = r_vals))
     #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
@@ -224,7 +235,5 @@ def plot_w_0():
     plt.xlabel("x/a")
     plt.show()
 
-w_n_i = calc_w_n_i()
-calc_mu_t()
-print(np.real(calc_mu_t_n()))
 
+print(np.real(calc_mu_t_n()))
