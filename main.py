@@ -2,19 +2,19 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
-from tqdm import trange
+from matplotlib.colors import LogNorm
 import time
 
-U = 10
+U = 1
 a = 1
 G = 2*np.pi
-dim = 100
+dim = 50
 k_L = np.pi
-band_cutoff = 6
-sites = 3
+band_cutoff = 20
+sites = 2
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,5001)
+r_vals = np.linspace(-8*a,8*a,2001)
 k_vals = np.linspace(-np.pi/a,np.pi/a,1000, endpoint=False)
 band_vals = np.arange(0, band_cutoff)
 
@@ -39,7 +39,7 @@ def calc_c_k_m():
         gs_c_k_m.append(eigvecs[:, 0])
     return gs_c_k_m
 
-
+@time_this
 def calc_c_k_n_m():  #produces c_k_n_m[k][n][m]
     main_diag = np.zeros((len(k_vals), len(m_vals)))
     sub_diag = np.full(2*dim, -U / 2)
@@ -55,19 +55,6 @@ def calc_c_k_n_m():  #produces c_k_n_m[k][n][m]
         for idn in range(band_cutoff):
             c_n_m.append(eigvecs[:, idn].astype(complex))
         c_k_n_m.append(c_n_m)
-
-  #  for idn in range(band_cutoff):
-   #     for idk, k in enumerate(k_vals):
-    #        # find index of -k
-     #       idk_minus = np.argmin(np.abs(k_vals + k))
-
-      #      target = np.conj(c_k_n_m[idk][idn][::-1])
-
-       #     phase = np.angle(
-         #       np.vdot(c_k_n_m[idk_minus][idn], target)
-        #    )
-
-          #  c_k_n_m[idk_minus][idn] *= np.exp(1j * phase)
 
     for idn in range(band_cutoff):  #Gauge smoothing
        for idk in range(len(k_vals)):
@@ -179,7 +166,7 @@ def calc_w_n_i(): #produces w_n_i[n][i][r]
         # find point with largest amplitude
         idx = np.argmax(np.abs(w))
 
-        # rotate that point to be real
+        # rotate point to be real
         phase = np.angle(w[idx])
 
         w_n_i[n, :] *= np.exp(-1j * phase)
@@ -235,5 +222,53 @@ def plot_w_0():
     plt.xlabel("x/a")
     plt.show()
 
+@time_this
+def wegner_flow():
+    # H[n][m][i][j]
+    H_0 = np.real(calc_mu_t_n())
+    stepsize = 0.001
+    cutoff = 10000
 
-print(np.real(calc_mu_t_n()))
+    #Commutator
+    def commutator(A,B):
+        return np.einsum('npik,pmkj->nmij', A, B) - np.einsum('npik,pmkj->nmij', B, A)
+
+    #Define G[n][m][i][j]
+    id = np.eye(sites)
+    G = np.zeros((len(band_vals), len(band_vals), sites, sites))
+    for idn in range(len(band_vals)):
+        if idn == 0:
+            G[idn][idn] = id
+        else:
+            G[idn][idn] = 2*id
+
+    H_prime = H_0
+    tol = 1e-12
+    for i in range(cutoff):
+        # define eta
+        eta = commutator(H_prime, G)
+        dH = commutator(eta, H_prime)
+        H_prime = H_prime + stepsize*dH
+    print(H_prime)
+    return H_prime
+
+#print(np.real(calc_mu_t_n()))
+H = wegner_flow()
+# H has shape (bands, bands, sites, sites)
+bands, _, sites, _ = H.shape
+
+# Convert to one big matrix
+H_big = H.transpose(0, 2, 1, 3).reshape(bands * sites, bands * sites)
+
+plt.figure(figsize=(sites*band_cutoff, sites*band_cutoff))
+plt.imshow(np.abs(H_big),
+           origin='upper',
+           cmap='magma',
+           norm=LogNorm(vmin=1e-10, vmax=np.max(np.abs(H_big))))
+
+plt.colorbar(label=r"$|H_{ij}|$")
+plt.xlabel("State index")
+plt.ylabel("State index")
+plt.title("Hamiltonian")
+plt.tight_layout()
+plt.show()
