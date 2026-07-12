@@ -5,17 +5,17 @@ import matplotlib.pyplot as plt
 from tqdm import trange
 import time
 
-U = 1
+U = 10
 a = 1
 G = 2*np.pi
 dim = 100
 k_L = np.pi
-band_cutoff = 20
-sites = 6
+band_cutoff = 4
+sites = 2
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-4*a,4*a,1001)
-k_vals = np.linspace(-np.pi/a,np.pi/a,1000)
+r_vals = np.linspace(-8*a,8*a,10001)
+k_vals = np.linspace(-np.pi/a,np.pi/a,1000, endpoint=False)
 band_vals = np.arange(0, band_cutoff)
 
 def time_this(func):
@@ -127,7 +127,7 @@ def calc_w_n_0(): #produces w_n_0[n][r]
 
 def calc_pot():
     A_0 = U
-    A_p = -U
+    A_p = -U/10
     Rms_p = 0.05
     V_0 = []
     Pert = []
@@ -179,12 +179,12 @@ def calc_mu_t_n():
     w_n_i = calc_w_n_i() #want to produce w_n_i[n][i][r]
     H = np.zeros((len(band_vals), len(band_vals), sites, sites), dtype = complex) #want to produce H[n][m][i][j]
     V_0, V_1 = calc_pot()
-
-    for idn in trange(len(band_vals)):
-        for idm in range(len(band_vals)):
-            for idi in range(sites):
-                for idj in range(sites):
-                    H[idn][idm][idi][idj] = simpson(    np.conj(w_n_i[idn][idi])    *      (np.gradient(np.gradient(w_n_i[idm][idj]/ k_L**2)) + V_0* w_n_i[idm][idj] + V_1 * w_n_i[idm][idj]) , r_vals       )
+    for idm in range(len(band_vals)):
+        for idj in range(sites):
+            kin = -np.gradient( np.gradient(w_n_i[idm][idj],r_vals),r_vals) / k_L ** 2
+            for idn in range(len(band_vals)):
+                for idi in range(sites):
+                    H[idn][idm][idi][idj] = simpson(    np.conj(w_n_i[idn][idi])    *      (kin + V_0* w_n_i[idm][idj] + V_1 * w_n_i[idm][idj]) , r_vals       )
     return H
 
 
@@ -213,9 +213,7 @@ def plot_w_0():
         pertpot.append( V_0[idr] + pert[idr])
 
     plt.figure()
-    plt.plot(r_vals, pertpot, label="Potential")
-    #plt.plot(r_vals, np.imag(u_n_k[1][4]), label="0th wannier")
-    #plt.plot(r_vals, np.real(u_n_k[1][4]), label="1")
+    #plt.plot(r_vals, pertpot, label="Potential")
     plt.plot(r_vals, np.real(w_n_i[3][0]), label="2")
     plt.plot(r_vals, np.imag(w_n_i[3][0]), label="3")
     plt.plot(r_vals, np.abs(w_n_i[3][0])**2, label="4")
@@ -226,7 +224,7 @@ def plot_w_0():
     plt.xlabel("x/a")
     plt.show()
 
+w_n_i = calc_w_n_i()
+calc_mu_t()
+print(np.real(calc_mu_t_n()))
 
-print(calc_w_n_i())
-plot_w_0()
-#print(np.max(np.abs(w_n_i - )))
