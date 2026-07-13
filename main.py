@@ -271,4 +271,5 @@ plt.xlabel("State index")
 plt.ylabel("State index")
 plt.title("Hamiltonian")
 plt.tight_layout()
+
 plt.show()
