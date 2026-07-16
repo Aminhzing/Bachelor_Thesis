@@ -1,20 +1,22 @@
 import numpy as np
+from numpy.ma.core import argmax
 from scipy.optimize import curve_fit
 from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import time
 
-U = 1
+
+U = 10
 a = 1
 G = 2*np.pi
 dim = 50
 k_L = np.pi
-band_cutoff = 20
-sites = 2
+band_cutoff = 3
+sites = 3
 
 m_vals = np.arange(-dim, dim+1)
-r_vals = np.linspace(-8*a,8*a,2001)
+r_vals = np.linspace(-14*a,14*a,6001)
 k_vals = np.linspace(-np.pi/a,np.pi/a,1000, endpoint=False)
 band_vals = np.arange(0, band_cutoff)
 
@@ -226,50 +228,67 @@ def plot_w_0():
 def wegner_flow():
     # H[n][m][i][j]
     H_0 = np.real(calc_mu_t_n())
-    stepsize = 0.001
-    cutoff = 10000
+    stepsize = 0.00001
+    cutoff = 100000
 
     #Commutator
     def commutator(A,B):
         return np.einsum('npik,pmkj->nmij', A, B) - np.einsum('npik,pmkj->nmij', B, A)
 
     #Define G[n][m][i][j]
-    id = np.eye(sites)
     G = np.zeros((len(band_vals), len(band_vals), sites, sites))
-    for idn in range(len(band_vals)):
-        if idn == 0:
-            G[idn][idn] = id
-        else:
-            G[idn][idn] = 2*id
 
+    #Calculate Band gap
+    H_exc = (H_0[1:, 1:].transpose(0, 2, 1, 3).reshape((len(band_vals)-1) * sites, (len(band_vals)-1) * sites))
+    H_ground = H_0[0, 0]
+    ground_eigs = np.linalg.eigvalsh(H_ground)
+    excited_eigs = np.linalg.eigvalsh(H_exc)
+    highest_ground = ground_eigs.max()
+    lowest_excited = excited_eigs.min()
+    d = lowest_excited - highest_ground
+    print(d)
+
+    #Iteratation
     H_prime = H_0
-    tol = 1e-12
+    eta_I = []
+    #coupling = []
+
     for i in range(cutoff):
-        # define eta
-        eta = commutator(H_prime, G)
+        for idn in range(len(band_vals)):
+            G[idn][idn] = H_prime[idn][idn]
+        #c_I = np.zeros((2 * len(band_vals) - 2, sites, sites)) #produces coupling[idn][idi][idj][i]
+        #for idi in range(sites):
+         #   for idj in range(sites):
+          #      for idn in range(1, len(band_vals) ):
+           #         c_I[idn-1][idi][idj] = H_prime[0][idn][idi][idj]
+            #    for idm in range(1, len(band_vals)):
+             #       c_I[len(band_vals)-1 + idm-1][idi][idj] = H_prime[idm][0][idi][idj]
+        #coupling.append(c_I)
+        eta = commutator(G, H_prime)
         dH = commutator(eta, H_prime)
         H_prime = H_prime + stepsize*dH
-    print(H_prime)
+        eta_I.append(eta)
     return H_prime
 
-#print(np.real(calc_mu_t_n()))
-H = wegner_flow()
-# H has shape (bands, bands, sites, sites)
-bands, _, sites, _ = H.shape
+@time_this
+def plot_wegner():
+    H = wegner_flow()
+    # H has shape (bands, bands, sites, sites)
+    bands, _, sites, _ = H.shape
 
-# Convert to one big matrix
-H_big = H.transpose(0, 2, 1, 3).reshape(bands * sites, bands * sites)
+    # Convert to one big matrix
+    H_big = H.transpose(0, 2, 1, 3).reshape(bands * sites, bands * sites)
 
-plt.figure(figsize=(sites*band_cutoff, sites*band_cutoff))
-plt.imshow(np.abs(H_big),
-           origin='upper',
-           cmap='magma',
-           norm=LogNorm(vmin=1e-10, vmax=np.max(np.abs(H_big))))
+    plt.figure(figsize=(sites*band_cutoff, sites*band_cutoff))
+    plt.imshow(np.abs(H_big), origin ='upper', cmap ='magma', norm = LogNorm(vmin=1e-20, vmax=np.max(H_big)))
 
-plt.colorbar(label=r"$|H_{ij}|$")
-plt.xlabel("State index")
-plt.ylabel("State index")
-plt.title("Hamiltonian")
-plt.tight_layout()
+    plt.colorbar(label=r"$|H_{ij}|$")
+    plt.xlabel("State index")
+    plt.ylabel("State index")
+    plt.title("Hamiltonian")
+    plt.tight_layout()
 
-plt.show()
+    plt.show()
+
+
+plot_wegner()
