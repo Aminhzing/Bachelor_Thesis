@@ -4,9 +4,9 @@ from scipy.integrate import simpson
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import time
-from scipy.sparse.linalg import expm_multiply
+from scipy.sparse.linalg import expm_multiply, expm
 
-U = 10
+U = 5
 a = 1
 G = 2*np.pi
 dim = 50
@@ -207,22 +207,22 @@ def calc_dmu_dt():
 def plot_w_0():
     V_0 , pert = calc_pot()
     #w_n_0 = calc_w_n_0()
-    u_n_k = calc_u_n_k()
-    w_n_i = calc_w_n_i()
-    #w_n_i_prime, _ = evolve_w_n_i()
+    #u_n_k = calc_u_n_k()
+    #w_n_i = calc_w_n_i()
+    w_n_i_prime, _ = evolve_w_n_i()
     pertpot = []
     for idr in range(len(r_vals)):
         pertpot.append( V_0[idr] + pert[idr])
 
     plt.figure()
-    plt.plot(r_vals, pertpot, label="Potential")
-    plt.plot(r_vals, np.real(w_n_i[0][9]), label="2")
-    plt.plot(r_vals, np.imag(w_n_i[0][9]), label="3")
-    plt.plot(r_vals, np.abs(w_n_i[0][9])**2, label="4")
-    #plt.plot(r_vals, np.real(w_n_i_prime[1][0]), label = "5")
-    #plt.plot(r_vals, np.real(w_n_i_prime[1][0]), label = "6")
-    #plt.plot(r_vals, np.abs(w_n_i_prime[1][0]), label="7")
-    plt.plot(r_vals, pert, label ="Perturbation")
+    #plt.plot(r_vals, pertpot, label="Potential")
+    #plt.plot(r_vals, np.real(w_n_i[0][9]), label="2")
+    #plt.plot(r_vals, np.imag(w_n_i[0][9]), label="3")
+    #plt.plot(r_vals, np.abs(w_n_i[0][9])**2, label="4")
+    #plt.plot(r_vals, np.real(w_n_i_prime[2][0]), label = "5")
+    #plt.plot(r_vals, np.real(w_n_i_prime[2][0]), label = "6")
+    plt.plot(r_vals, np.abs(w_n_i_prime[2][0]), label="7")
+    #plt.plot(r_vals, pert, label ="Perturbation")
     plt.legend()
     plt.ylabel("U/E$_{rec}$")
     plt.xlabel("x/a")
@@ -239,17 +239,22 @@ def wegner_flow():
         return np.einsum('npik,pmkj->nmij', A, B) - np.einsum('npik,pmkj->nmij', B, A)
 
     #Define G[n][m][i][j]
-    G = np.zeros((len(band_vals), len(band_vals), sites, sites))
-
+    G1 = np.zeros((band_cutoff, band_cutoff, sites, sites))
+    id = np.eye(sites)
+    for idn in range(band_cutoff):
+        if(idn == 0):
+            G1[idn][idn] = id
+        else:
+            G1[idn][idn] = 2*id
     #Calculate Band gap
-    H_exc = (H_0[1:, 1:].transpose(0, 2, 1, 3).reshape((len(band_vals)-1) * sites, (len(band_vals)-1) * sites))
-    H_ground = H_0[0, 0]
-    ground_eigs = np.linalg.eigvals(H_ground)
-    excited_eigs = np.linalg.eigvals(H_exc)
-    highest_ground = ground_eigs.max()
-    lowest_excited = excited_eigs.min()
-    d = lowest_excited - highest_ground
-    print(d)
+    #H_exc = (H_0[1:, 1:].transpose(0, 2, 1, 3).reshape((len(band_vals)-1) * sites, (len(band_vals)-1) * sites))
+    #H_ground = H_0[0, 0]
+    #ground_eigs = np.linalg.eigvals(H_ground)
+    #excited_eigs = np.linalg.eigvals(H_exc)
+    #highest_ground = ground_eigs.max()
+    #lowest_excited = excited_eigs.min()
+    #d = lowest_excited - highest_ground
+    #print(d)
 
     #Iteratation
     H_prime = H_0
@@ -257,8 +262,8 @@ def wegner_flow():
     #coupling = []
 
     for i in range(cutoff):
-        for idn in range(len(band_vals)):
-            G[idn][idn] = H_prime[idn][idn]
+        #for idn in range(len(band_vals)):
+            #G2[idn][idn] = H_prime[idn][idn]
         #c_I = np.zeros((2 * len(band_vals) - 2, sites, sites)) #produces coupling[idn][idi][idj][i]
         #for idi in range(sites):
          #   for idj in range(sites):
@@ -267,7 +272,7 @@ def wegner_flow():
             #    for idm in range(1, len(band_vals)):
              #       c_I[len(band_vals)-1 + idm-1][idi][idj] = H_prime[idm][0][idi][idj]
         #coupling.append(c_I)
-        eta = commutator(G, H_prime)
+        eta = commutator(G1, H_prime)
         dH = commutator(eta, H_prime)
         H_prime = H_prime + stepsize*dH
         eta_I.append(eta)
@@ -276,14 +281,14 @@ def wegner_flow():
 
 @time_this
 def plot_wegner():
-    H, _ = wegner_flow()
-
-    # Convert to one big matrix
-    H_big = H.transpose(0, 2, 1, 3).reshape(band_cutoff * sites, band_cutoff * sites)
+    H_prime, _ = wegner_flow()
+    #H_0 = calc_mu_t_n()
+    H_big_prime = H_prime.transpose(0, 2, 1, 3).reshape(band_cutoff * sites, band_cutoff * sites)
+    #H_big_0 = H_0.transpose(0, 2, 1, 3).reshape(band_cutoff * sites, band_cutoff * sites)
     cmap = plt.cm.magma.copy()
     cmap.set_bad("black")
     plt.figure(figsize=(sites*band_cutoff, sites*band_cutoff))
-    plt.imshow(np.abs(H_big), origin ='upper', cmap = cmap, norm = LogNorm(vmin=1e-20, vmax=np.max(H_big)))
+    plt.imshow(np.abs(H_big_prime), origin ='upper', cmap = cmap, norm = LogNorm(vmin=1e-14, vmax=np.max(H_big_prime)))
 
     plt.colorbar(label=r"$|H_{ij}|$")
     plt.xlabel("State index")
@@ -299,17 +304,20 @@ def evolve_w_n_i():
     eta_I = np.array(eta_I)
     w_n_i = calc_w_n_i() # w_n_i[n][i][r]
     w_flat = w_n_i.reshape(band_cutoff*sites, len(r_vals))
-
+    eta_big = eta_I.transpose(0, 2, 1, 3, 4).reshape(cutoff, band_cutoff * sites, band_cutoff * sites)
     for I in range(cutoff):
-        eta_big = eta_I[I].transpose(0, 2, 1, 3).reshape(band_cutoff * sites, band_cutoff * sites)
-        w_flat = expm_multiply(-eta_big * stepsize,w_flat)
+        U = expm(-eta_big[I] * stepsize)
+        w_flat = U @ w_flat
 
     w_n_i_prime = w_flat.reshape(band_cutoff, sites, len(r_vals))
 
-    overlap = simpson(np.conj(w_n_i_prime[0][0])* w_n_i[0][0], r_vals)
+    overlap = simpson(np.conj(w_n_i_prime[2][0])* w_n_i[2][0], r_vals)
     print(overlap)
+    print(simpson(np.conj(w_n_i_prime[2][0])* w_n_i_prime[2][0], r_vals))
     return w_n_i_prime, overlap
 
+#H_0 = calc_mu_t_n()
+#H_prime, _ = wegner_flow()
 plot_wegner()
-#evolve_w_n_i()
+evolve_w_n_i()
 #plot_w_0()
